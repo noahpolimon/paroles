@@ -1,0 +1,19 @@
+[package]
+name = "paroles"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+reqwest = { version = "0.12.12", features = ["blocking", "json"] }
+serde = { version = "1.0.217", features = ["derive"] }
+anyhow = "1.0.95"
+thiserror = "2.0.9"
+mpris = "2.0.1"
+log = "0.4.22"
+lrc = "0.1.8"
+dbus = "0.9.7"
+strum = "0.23"
+strum_macros = "0.23"
+serde_json = "1.0.134"
