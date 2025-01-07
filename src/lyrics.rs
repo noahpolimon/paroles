@@ -18,6 +18,7 @@ pub enum FeatDelimiter<'a> {
     Feat,
     Ft,
     Featuring,
+    Ampersand,
     Custom(&'a str),
 }
 
@@ -29,58 +30,64 @@ impl fmt::Display for FeatDelimiter<'_> {
             FeatDelimiter::Feat => "feat.",
             FeatDelimiter::Ft => "ft.",
             FeatDelimiter::Featuring => "featuring",
+            FeatDelimiter::Ampersand => "&",
             FeatDelimiter::Custom(custom) => custom.trim(),
         };
 
-        write!(f, "{} ", s)
+        write!(f, "{}", s)
+    }
+}
+
+impl FeatDelimiter<'_> {
+    pub fn as_sep(&self) -> String {
+        format!("{} ", self.to_string())
     }
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct Query {
-    track_name: String,
+pub struct TrackInfo {
+    name: String,
     artist_names: Option<Vec<String>>,
     album_name: Option<String>,
     duration: Option<Duration>,
 }
 
-impl Query {
+impl TrackInfo {
     pub fn new(
-        track_name: String,
+        name: String,
         artist_names: Option<Vec<String>>,
         album_name: Option<String>,
         duration: Option<Duration>,
-    ) -> Query {
-        Query {
-            track_name,
+    ) -> TrackInfo {
+        TrackInfo {
+            name,
             artist_names,
             album_name,
             duration,
         }
     }
 
-    pub fn with_track_name(track_name: String) -> Query {
-        Query {
-            track_name,
+    pub fn with_name(name: String) -> TrackInfo {
+        TrackInfo {
+            name,
             ..Default::default()
         }
     }
 
-    pub fn from_title(title: String) -> Query {
-        if let Some(title) = title.split_once("-") {
-            Query {
+    pub fn from_title(title: String) -> TrackInfo {
+        if let Some((artists, name)) = title.split_once("-") {
+            TrackInfo {
                 artist_names: Some(
-                    title
-                        .1
-                        .split(FeatDelimiter::Comma.to_string().as_str())
-                        .map(ToString::to_string)
+                    artists
+                        .split(FeatDelimiter::Comma.as_sep().as_str())
+                        .map(|split| split.trim().into())
                         .collect(),
                 ),
-                track_name: title.0.to_string(),
+                name: name.to_string(),
                 ..Default::default()
             }
         } else {
-            Query::with_track_name(title)
+            TrackInfo::with_name(title)
         }
     }
 
@@ -90,7 +97,7 @@ impl Query {
 
     pub fn artist_names_str(&self, feat_delim: FeatDelimiter) -> Option<String> {
         let s = if let Some(artists) = &self.artist_names {
-            artists.join(feat_delim.to_string().as_str())
+            artists.join(feat_delim.as_sep().as_str())
         } else {
             "".into()
         };
@@ -102,8 +109,8 @@ impl Query {
         }
     }
 
-    pub fn track_name(&self) -> &String {
-        &self.track_name
+    pub fn name(&self) -> &String {
+        &self.name
     }
 
     pub fn duration(&self) -> Option<&Duration> {
@@ -114,17 +121,17 @@ impl Query {
         self.album_name.as_ref()
     }
 
-    pub fn to_track_title(&self, feat_delim: FeatDelimiter) -> String {
+    pub fn to_title(&self, feat_delim: FeatDelimiter) -> String {
         let artists = self.artist_names_str(feat_delim);
 
         if let Some(artists) = artists {
-            format!("{} - {}", artists, self.track_name)
+            format!("{} - {}", artists, self.name)
         } else {
-            self.track_name.clone()
+            self.name.clone()
         }
     }
 
-    pub fn has_track_name_only(&self) -> bool {
+    pub fn has_name_only(&self) -> bool {
         let has_artist = self.artist_names.is_some() && self.artist_names().unwrap().is_empty();
 
         !has_artist && self.album_name.is_none() && self.duration.is_none()

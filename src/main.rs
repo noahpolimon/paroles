@@ -1,9 +1,7 @@
 use anyhow::anyhow;
 use anyhow::Result;
-// use dbus::ffidisp::Connection;
 use lrc::Lyrics;
-use lyrics::Query;
-use mpris;
+use lyrics::TrackInfo;
 use mpris::PlaybackStatus;
 use providers::Provider;
 
@@ -13,10 +11,11 @@ mod providers;
 mod response;
 
 fn main() -> Result<()> {
-    // let conn = Connection::new_session()?;
-    // let player_finder = mpris::PlayerFinder::for_connection(conn);
-
     let player_finder = mpris::PlayerFinder::new()?;
+    // FIXME: find other mpris player with status Playing if lyrics for this one is not found.
+    //
+    // Reason: applications such as KDEConnect also uses MPRIS, so it might default to that if media
+    // such as a YT video or Twitch Stream is playing on other devices.
     let player = player_finder.find_active();
     let mpris_metadata: mpris::Metadata;
 
@@ -37,14 +36,19 @@ fn main() -> Result<()> {
     let album = mpris_metadata.album_name();
 
     if let Some(title) = title {
-        let query = Query::new(
+        let query = TrackInfo::new(
             title.into(),
             artists.map(|artists| artists.iter().map(ToString::to_string).collect()),
             album.map(|a| a.into()),
             mpris_metadata.length(),
         );
 
-        let response = Provider::LRCLib.search(query)?;
+        println!(
+            "Currently Playing: {}\n",
+            query.to_title(Default::default())
+        );
+
+        let response = Provider::LRCLib.search(query.clone())?;
 
         let mut index = 0;
 
@@ -57,7 +61,7 @@ fn main() -> Result<()> {
         }
 
         let lyrics = if index >= response.len() {
-            response.first().unwrap().plain_lyrics.as_ref()
+            return Err(anyhow!("Synced Lyrics not found"));
         } else {
             response.get(index).unwrap().synced_lyrics.as_ref()
         };
@@ -67,10 +71,10 @@ fn main() -> Result<()> {
 
         // TODO: refactor
         if let Ok(lrc) = lrc {
-            for line in lrc.get_timed_lines().iter() {
+            for (tag, line) in lrc.get_timed_lines().iter() {
                 let mut position = player.get_position().unwrap();
 
-                while line.0.get_timestamp() >= position.as_millis().try_into().unwrap() {
+                while tag.get_timestamp() >= position.as_millis().try_into().unwrap() {
                     if !player.is_running() {
                         break;
                     }
@@ -82,7 +86,7 @@ fn main() -> Result<()> {
                     position = player.get_position().unwrap();
                 }
 
-                println!("{}", line.1);
+                println!("{} {}", tag, line);
             }
         } else {
             return Err(anyhow!(""));

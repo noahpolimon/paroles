@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use crate::{
     errors::NoError,
-    lyrics::{FeatDelimiter, Query},
+    lyrics::{FeatDelimiter, TrackInfo},
     response::{Response, ResponseError},
 };
 use anyhow::{anyhow, Result};
@@ -21,7 +21,7 @@ pub enum Provider {
 }
 
 impl Provider {
-    pub fn search(&self, query: Query) -> Result<Response> {
+    pub fn search(&self, query: TrackInfo) -> Result<Response> {
         match self {
             Provider::LRCLib => LRCLib::search(query),
             Provider::Genius => Genius::search(query),
@@ -51,23 +51,23 @@ impl Provider {
 }
 
 pub trait ProviderTrait {
-    fn search(query: Query) -> Result<Response>;
+    fn search(query: TrackInfo) -> Result<Response>;
 }
 
 struct LRCLib;
 
 impl ProviderTrait for LRCLib {
-    fn search(query: Query) -> Result<Response> {
+    fn search(query: TrackInfo) -> Result<Response> {
         let feat_delim = FeatDelimiter::Comma;
 
         let mut params = Vec::new();
 
-        let is_conditional_search = if query.has_track_name_only() {
-            params.push(("q", query.track_name().clone()));
+        let is_conditional_search = if query.has_name_only() {
+            params.push(("q", query.name().clone()));
 
             true
         } else {
-            params.push(("track_name", query.track_name().clone()));
+            params.push(("track_name", query.name().clone()));
 
             let artists = query.artist_names_str(feat_delim);
 
@@ -105,7 +105,7 @@ impl ProviderTrait for LRCLib {
         };
 
         if result.is_err() && !is_conditional_search {
-            return Self::search(Query::with_track_name(query.to_track_title(feat_delim)));
+            return Self::search(TrackInfo::with_name(query.to_title(feat_delim)));
         }
 
         result
@@ -115,7 +115,7 @@ impl ProviderTrait for LRCLib {
 struct Genius;
 
 impl ProviderTrait for Genius {
-    fn search(query: Query) -> Result<Response> {
+    fn search(query: TrackInfo) -> Result<Response> {
         todo!()
     }
 }
