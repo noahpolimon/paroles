@@ -1,12 +1,7 @@
-// TODO: remove this
-#![allow(unused)]
-
-use std::time::Duration;
-
 use crate::{
     errors::NoError,
-    lyrics::{FeatDelimiter, TrackInfo},
     response::{Response, ResponseError},
+    track::{FeatDelimiter, TrackInfo},
 };
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
@@ -23,41 +18,35 @@ pub enum Provider {
 impl Provider {
     pub fn search(&self, query: TrackInfo) -> Result<Response> {
         match self {
-            Provider::LRCLib => LRCLib::search(query),
-            Provider::Genius => Genius::search(query),
-            Provider::All => {
-                let mut response = vec![];
-                let mut err = anyhow!(NoError);
-
-                for provider in Provider::iter().filter(|p| p != &Provider::All) {
-                    match provider.search(query.clone()) {
-                        Ok(metadata) => response.extend(metadata),
-                        Err(e) => {
-                            if err.is::<NoError>() {
-                                err = e;
-                            }
-                        }
-                    };
-                }
-
-                if response.is_empty() && !err.is::<NoError>() {
-                    return Err(err);
-                }
-
-                Ok(response)
-            }
+            Self::LRCLib => Self::search_lrclib(query),
+            Self::Genius => Self::search_genius(query),
+            Self::All => Self::search_all(query),
         }
     }
-}
 
-pub trait ProviderTrait {
-    fn search(query: TrackInfo) -> Result<Response>;
-}
+    fn search_all(query: TrackInfo) -> Result<Response> {
+        let mut response = vec![];
+        let mut err = anyhow!(NoError);
 
-struct LRCLib;
+        for provider in Provider::iter().filter(|p| p != &Provider::All) {
+            match provider.search(query.clone()) {
+                Ok(metadata) => response.extend(metadata),
+                Err(e) => {
+                    if err.is::<NoError>() {
+                        err = e;
+                    }
+                }
+            };
+        }
 
-impl ProviderTrait for LRCLib {
-    fn search(query: TrackInfo) -> Result<Response> {
+        if response.is_empty() && !err.is::<NoError>() {
+            return Err(err);
+        }
+
+        Ok(response)
+    }
+
+    fn search_lrclib(query: TrackInfo) -> Result<Response> {
         let feat_delim = FeatDelimiter::Comma;
 
         let mut params = Vec::new();
@@ -105,17 +94,13 @@ impl ProviderTrait for LRCLib {
         };
 
         if result.is_err() && !is_conditional_search {
-            return Self::search(TrackInfo::with_name(query.to_title(feat_delim)));
+            return Self::search_lrclib(TrackInfo::with_name(query.to_title(feat_delim)));
         }
 
         result
     }
-}
 
-struct Genius;
-
-impl ProviderTrait for Genius {
-    fn search(query: TrackInfo) -> Result<Response> {
+    fn search_genius(query: TrackInfo) -> Result<Response> {
         todo!()
     }
 }

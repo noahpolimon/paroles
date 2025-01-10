@@ -1,6 +1,6 @@
 # Paroles
 
-A rust-based cli tool and service to fetch synced lyrics and synchronize them with the active MPRIS Player.
+A rust-based cli tool and service to fetch synced lyrics and synchronize them with active playing media.
 
 ## Build Instructions
 
@@ -38,5 +38,6 @@ _Note:_ At this point in development, paroles is not ready for use, so just use 
 - [ ] Ignore when no synced lyrics available (subject to removal)
 - [ ] Cache lyrics
 - [ ] Write current line to a UnixSocket
+- [ ] Windows Support
 
 _Note:_ Paroles is a work in progress and may change during its development.

@@ -1,14 +1,34 @@
+// Paroles is a rust-based cli tool and service to fetch synced lyrics and
+// synchronize them with playing media.
+// Copyright (C) 2025 noahpolimon
+//
+// This program is free software; you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation; either version 2 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License along
+// with this program; if not, write to the Free Software Foundation, Inc.,
+// 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+//
 use anyhow::anyhow;
 use anyhow::Result;
 use lrc::Lyrics;
-use lyrics::TrackInfo;
 use mpris::PlaybackStatus;
 use providers::Provider;
+use track::TrackInfo;
 
 mod errors;
-mod lyrics;
+mod playback;
+mod player;
 mod providers;
 mod response;
+mod track;
 
 fn main() -> Result<()> {
     let player_finder = mpris::PlayerFinder::new()?;
@@ -25,10 +45,10 @@ fn main() -> Result<()> {
         if let Ok(metadata) = metadata_temp {
             mpris_metadata = metadata;
         } else {
-            return Err(anyhow!(""));
+            return Err(anyhow!("Failed to retrieve media metadata from Player"));
         }
     } else {
-        return Err(anyhow!(""));
+        return Err(anyhow!("No Player Found"));
     }
 
     let artists = mpris_metadata.artists();
@@ -89,10 +109,10 @@ fn main() -> Result<()> {
                 println!("{} {}", tag, line);
             }
         } else {
-            return Err(anyhow!(""));
+            return Err(anyhow!("Failed to parse lyrics"));
         }
     } else {
-        return Err(anyhow!(""));
+        return Err(anyhow!("No title provided"));
     }
 
     Ok(())

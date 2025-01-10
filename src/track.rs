@@ -91,6 +91,29 @@ impl TrackInfo {
         }
     }
 
+    #[cfg(all(unix, not(target_vendor = "apple")))]
+    pub fn try_from_mpris_metadata(metadata: &mpris::Metadata) -> Result<TrackInfo> {
+        let name = if let Some(name) = metadata.title() {
+            name.into()
+        } else {
+            return Err(anyhow!("Invalid MPRIS Metadata"));
+        };
+
+        Ok(TrackInfo {
+            name,
+            artist_names: metadata
+                .artists()
+                .map(|artists| artists.iter().map(ToString::to_string).collect()),
+            album_name: metadata.album_name().map(|a| a.into()),
+            duration: metadata.length(),
+        })
+    }
+
+    #[cfg(windows)]
+    pub fn try_from__() -> Result<TrackInfo> {
+        todo!()
+    }
+
     pub fn artist_names(&self) -> Option<&Vec<String>> {
         self.artist_names.as_ref()
     }
