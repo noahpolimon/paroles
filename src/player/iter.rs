@@ -3,7 +3,7 @@ use gsmtc::{ManagerEvent, SessionUpdateEvent};
 
 use tokio::runtime::Runtime as TokioRuntime;
 
-use super::player::Player;
+use super::Player;
 
 #[derive(Debug)]
 pub enum PlayerIter {
@@ -31,14 +31,14 @@ pub struct GsmtcEventIter {
 }
 
 impl GsmtcEventIter {
-    pub fn new(events: Vec<ManagerEvent>) -> Result<Self> {
+    pub fn new(events: Vec<ManagerEvent>) -> Result<GsmtcEventIter> {
         Ok(Self {
             manager_events: events.into_iter(),
             tokio_runtime: TokioRuntime::new()?,
         })
     }
 
-    // pub fn with_tokio_runtime(events: Vec<ManagerEvent>, runtime: TokioRuntime) -> Self {
+    // pub fn with_tokio_runtime(events: Vec<ManagerEvent>, runtime: TokioRuntime) -> GsmtcEventIter {
     //     Self {
     //         manager_events: events.into_iter(),
     //         tokio_runtime: runtime,

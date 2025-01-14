@@ -1,10 +1,14 @@
 use std::time::Duration;
 
-use crate::playback::status::PlaybackStatus;
+use crate::playback::PlaybackStatus;
 use anyhow::{anyhow, Result};
 use dbus::arg::RefArg;
-use gsmtc::SessionModel as Gsmtc;
+use gsmtc::SessionUpdateEvent;
 use mpris::Player as Mpris;
+use tokio::sync::mpsc::UnboundedReceiver;
+
+// TODO: wrap for eaier manipulation
+type Gsmtc = UnboundedReceiver<SessionUpdateEvent>;
 
 #[derive(Debug)]
 pub enum Player {
@@ -19,26 +23,14 @@ impl Player {
                 .get_playback_status()
                 .map(|status| PlaybackStatus::from_mpris_status(&status))
                 .map_err(|err| anyhow!(err)),
-            Player::Gsmtc(model) => model
-                .playback
-                .as_ref()
-                .map(|playback| PlaybackStatus::from_gsmtc_status(&playback.status))
-                .ok_or(anyhow!("")),
+            Player::Gsmtc(events) => todo!(),
         }
     }
 
     pub fn get_position(&self) -> Result<Duration> {
         match self {
             Player::Mpris(player) => player.get_position().map_err(|err| anyhow!(err)),
-            Player::Gsmtc(model) => Ok(Duration::from_millis(
-                model
-                    .timeline
-                    .as_ref()
-                    .ok_or(anyhow!(""))?
-                    .position
-                    .as_u64()
-                    .ok_or(anyhow!(""))?,
-            )),
+            Player::Gsmtc(events) => todo!(),
         }
     }
 }

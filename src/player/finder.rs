@@ -1,17 +1,18 @@
 // Experimental support for multiple OSes
 // Linux/BSD: MPRIS, Windows: GSMTC
 
-// TODO: remove this
-#![allow(unused)]
-
+use crate::errors::FindingError;
 use anyhow::{anyhow, Result};
 use gsmtc::ManagerEvent;
+use mpris::PlayerFinder as Mpris;
 use tokio::sync::mpsc::UnboundedReceiver;
 
 use super::{
-    iter::{GsmtcEventIter, PlayerIter},
-    player::Player,
+    Player, {GsmtcEventIter, PlayerIter},
 };
+
+// TODO: wrap in type for easier manipulation
+type Gsmtc = UnboundedReceiver<ManagerEvent>;
 
 #[derive(Debug)]
 pub struct PlayerFinder {
@@ -32,11 +33,16 @@ impl PlayerFinder {
     pub fn find_all(&self) -> Result<Vec<Player>> {
         self.iter_players()
             .map(|iter| iter.into_iter().flatten().collect())
+            .map_err(|err| anyhow!(FindingError("players".into())))
     }
 
     pub fn find_first(&self) -> Result<Player> {
-        self.iter_players()
-            .map(|iter| iter.into_iter().flatten().next().ok_or(anyhow!("")))?
+        self.iter_players().map(|iter| {
+            iter.into_iter()
+                .flatten()
+                .next()
+                .ok_or(anyhow!(FindingError("first player".into())))
+        })?
     }
 
     pub fn find_active(&self) -> Result<Player> {
@@ -49,22 +55,22 @@ impl PlayerFinder {
                         false
                     }
                 })
-                .ok_or(anyhow!(""))
+                .ok_or(anyhow!(FindingError("active player".into())))
         })?
     }
 }
 
 #[derive(Debug)]
 enum InnerPlayerFinder {
-    Mpris(mpris::PlayerFinder),
-    Gsmtc(UnboundedReceiver<ManagerEvent>),
+    Mpris(Mpris),
+    Gsmtc(Gsmtc),
 }
 
 impl InnerPlayerFinder {
     pub fn new() -> Result<Self> {
         #[cfg(all(unix, not(target_vendor = "apple")))]
         {
-            return Ok(Self::Mpris(mpris::PlayerFinder::new()?));
+            return Ok(Self::Mpris(Mpris::new()?));
         }
 
         #[cfg(windows)]

@@ -1,3 +1,4 @@
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -32,5 +33,17 @@ impl ResponseError {
             error,
             message,
         }
+    }
+}
+
+pub fn req_response_to_local_response(res: reqwest::blocking::Response) -> Result<Response> {
+    match res.status() {
+        reqwest::StatusCode::OK => Ok(res.json::<Response>()?),
+        reqwest::StatusCode::BAD_REQUEST
+        | reqwest::StatusCode::SERVICE_UNAVAILABLE
+        | reqwest::StatusCode::INTERNAL_SERVER_ERROR => Err(res.json::<ResponseError>()?.into()),
+        _ => Err(
+            ResponseError::new(None, "UnknownError".into(), "Unknown error happened".into()).into(),
+        ),
     }
 }

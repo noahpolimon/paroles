@@ -3,11 +3,11 @@ use mpris::PlaybackStatus as MprisStatus;
 
 #[derive(Debug, PartialEq)]
 pub enum PlaybackStatus {
-    /// Support: Linux/BSD, Windows
+    /// Support: Linux, BSD, Windows
     Playing,
-    /// Support: LinuxBSD, Windows
+    /// Support: Linux, BSD, Windows
     Paused,
-    /// Support: Linux, Windows
+    /// Support: Linux, BSD, Windows
     Stopped,
     /// Support: Windows
     Opened,

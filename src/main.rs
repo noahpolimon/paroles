@@ -16,40 +16,32 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 //
-use anyhow::anyhow;
-use anyhow::Result;
-use lrc::Lyrics;
-use mpris::PlaybackStatus;
-use providers::Provider;
-use track::TrackInfo;
-
 mod errors;
+mod events;
 mod playback;
 mod player;
 mod providers;
 mod response;
 mod track;
 
+use anyhow::anyhow;
+use anyhow::Result;
+use dbus::ffidisp::Connection;
+use lrc::Lyrics;
+use lrc::TimeTag;
+use providers::LRCLib;
+use providers::{LyricsFinder, Provider};
+use track::TrackInfo;
+
 fn main() -> Result<()> {
-    let player_finder = mpris::PlayerFinder::new()?;
+    let connection = Connection::new_session()?;
+    let player_finder = mpris::PlayerFinder::for_connection(connection);
     // FIXME: find other mpris player with status Playing if lyrics for this one is not found.
     //
     // Reason: applications such as KDEConnect also uses MPRIS, so it might default to that if media
     // such as a YT video or Twitch Stream is playing on other devices.
-    let player = player_finder.find_active();
-    let mpris_metadata: mpris::Metadata;
-
-    if let Ok(player) = player {
-        let metadata_temp = player.get_metadata();
-
-        if let Ok(metadata) = metadata_temp {
-            mpris_metadata = metadata;
-        } else {
-            return Err(anyhow!("Failed to retrieve media metadata from Player"));
-        }
-    } else {
-        return Err(anyhow!("No Player Found"));
-    }
+    let mut player = player_finder.find_active()?;
+    let mpris_metadata = player.get_metadata()?;
 
     let artists = mpris_metadata.artists();
     let title = mpris_metadata.title();
@@ -68,7 +60,11 @@ fn main() -> Result<()> {
             query.to_title(Default::default())
         );
 
-        let response = Provider::LRCLib.search(query.clone())?;
+        let lrclib = LRCLib::new()?;
+
+        let lyrics_finder = lyrics_finder!(&lrclib);
+
+        let response = lyrics_finder.search(query.clone())?;
 
         let mut index = 0;
 
@@ -86,33 +82,48 @@ fn main() -> Result<()> {
             response.get(index).unwrap().synced_lyrics.as_ref()
         };
 
-        let lrc = Lyrics::from_str(lyrics.unwrap());
-        let mut player = player_finder.find_active().unwrap();
+        let lrc = Lyrics::from_str(lyrics.unwrap())?;
+        player = player_finder.find_active().unwrap();
 
-        // TODO: refactor
-        if let Ok(lrc) = lrc {
-            for (tag, line) in lrc.get_timed_lines().iter() {
-                let mut position = player.get_position().unwrap();
+        let start_timed_lyric = [(TimeTag::new(0), "".into())];
 
-                while tag.get_timestamp() >= position.as_millis().try_into().unwrap() {
-                    if !player.is_running() {
-                        break;
-                    }
+        let mut peekable_timed_lines = start_timed_lyric
+            .iter()
+            .chain(lrc.get_timed_lines())
+            .peekable();
 
-                    if player.get_playback_status().unwrap() != PlaybackStatus::Playing {
-                        player = player_finder.find_active().unwrap();
-                    }
+        while let Some((tag, line)) = peekable_timed_lines.next() {
+            let next_timestamp = peekable_timed_lines.peek().map_or_else(
+                || {
+                    mpris_metadata
+                        .length()
+                        .map(|duration| duration.as_micros() as i64)
+                        .unwrap_or_else(|| i64::MAX)
+                },
+                |(tag, _)| tag.get_timestamp(),
+            );
 
-                    position = player.get_position().unwrap();
+            let time_range = tag.get_timestamp()..next_timestamp;
+
+            let mut position = player.get_position().unwrap().as_millis() as i64;
+
+            let mut flag = false;
+
+            while !time_range.contains(&position) {
+                position = player.get_position().unwrap().as_millis() as i64;
+
+                if position > next_timestamp {
+                    flag = true;
+                    break;
                 }
+            }
 
+            if !flag {
                 println!("{} {}", tag, line);
             }
-        } else {
-            return Err(anyhow!("Failed to parse lyrics"));
         }
     } else {
-        return Err(anyhow!("No title provided"));
+        return Err(anyhow!("Failed to parse lyrics"));
     }
 
     Ok(())
