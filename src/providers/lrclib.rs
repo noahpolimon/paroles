@@ -1,12 +1,9 @@
 use anyhow::{anyhow, Result};
 use reqwest::{blocking::Client, header::HeaderMap};
 
-use crate::{
-    response::{req_response_to_local_response, Response},
-    track::{FeatDelimiter, TrackInfo},
-};
+use crate::track::{ArtistsDelimiter, TrackInfo};
 
-use super::Provider;
+use super::{req_response_to_local_response, Provider, Response};
 
 #[derive(Debug, Default)]
 pub struct LRCLib {
@@ -29,10 +26,10 @@ impl LRCLib {
 }
 
 impl Provider for LRCLib {
-    fn search(&self, query: TrackInfo) -> Result<Response> {
-        let feat_delim = FeatDelimiter::Comma;
+    fn search(&self, query: &TrackInfo) -> Result<Response> {
+        let feat_delim = ArtistsDelimiter::Comma;
 
-        let mut params = Vec::new();
+        let mut params = vec![];
 
         let is_conditional_search = if query.has_name_only() {
             params.push(("q", query.name().into()));
@@ -63,9 +60,17 @@ impl Provider for LRCLib {
 
         let result = req_response_to_local_response(res);
 
-        if result.is_err() && !is_conditional_search {
-            return self.search(TrackInfo::with_name(query.to_title(feat_delim)));
-        }
+        // let search_again = if let Ok(result) = &result {
+        //     result.is_empty()
+        // } else {
+        //     !is_conditional_search
+        // };
+
+        // if search_again {
+        //     return self
+        //         .search(&TrackInfo::with_name(query.to_title(feat_delim)))
+        //         .or_else(|_| self.search(&TrackInfo::with_name(query.name().into())));
+        // }
 
         result
     }

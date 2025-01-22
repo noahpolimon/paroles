@@ -2,11 +2,11 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Metadata {
+pub struct LyricsMetadata {
     pub id: Option<i64>,
-    pub name: Option<String>,
+    pub track_name: Option<String>,
     pub artist_name: Option<String>,
     pub album_name: Option<String>,
     pub duration: Option<f64>,
@@ -15,7 +15,7 @@ pub struct Metadata {
     pub synced_lyrics: Option<String>,
 }
 
-pub type Response = Vec<Metadata>;
+pub type Response = Vec<LyricsMetadata>;
 
 #[derive(Debug, Deserialize, Error)]
 #[serde(rename_all = "camelCase")]

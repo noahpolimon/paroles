@@ -1,5 +1,5 @@
+pub mod loop_status;
 pub mod status;
-pub mod r#type;
 
-pub use r#type::*;
+pub use loop_status::*;
 pub use status::*;

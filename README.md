@@ -4,6 +4,8 @@ A rust-based cli tool and service to fetch synced lyrics and synchronize them wi
 
 ## Build Instructions
 
+### Note that, Paroles, as of now, is only supported on Linux and BSD systems.
+
 To build it, you need to have rustup installed:
 
 ```bash
@@ -19,7 +21,7 @@ cd paroles
 cargo run
 ```
 
-_Note:_ At this point in development, paroles is not ready for use, so just use the `cargo run` for now.
+_Note:_ At this point in development, paroles is not ready for use, so just use the `cargo run` command for now.
 
 ## Todo List
 

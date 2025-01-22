@@ -18,16 +18,24 @@ pub enum PlaybackStatus {
 }
 
 impl PlaybackStatus {
-    pub fn from_mpris_status(status: &MprisStatus) -> PlaybackStatus {
-        match status {
+    pub fn is_active(self) -> bool {
+        self == PlaybackStatus::Playing
+    }
+}
+
+impl Into<PlaybackStatus> for MprisStatus {
+    fn into(self) -> PlaybackStatus {
+        match self {
             MprisStatus::Playing => PlaybackStatus::Playing,
             MprisStatus::Paused => PlaybackStatus::Paused,
             MprisStatus::Stopped => PlaybackStatus::Stopped,
         }
     }
+}
 
-    pub fn from_gsmtc_status(status: &GsmtcStatus) -> PlaybackStatus {
-        match status {
+impl Into<PlaybackStatus> for GsmtcStatus {
+    fn into(self) -> PlaybackStatus {
+        match self {
             GsmtcStatus::Closed => PlaybackStatus::Closed,
             GsmtcStatus::Opened => PlaybackStatus::Opened,
             GsmtcStatus::Changing => PlaybackStatus::Changing,
@@ -35,9 +43,5 @@ impl PlaybackStatus {
             GsmtcStatus::Playing => PlaybackStatus::Playing,
             GsmtcStatus::Paused => PlaybackStatus::Paused,
         }
-    }
-
-    pub fn is_active(self) -> bool {
-        self == PlaybackStatus::Playing
     }
 }

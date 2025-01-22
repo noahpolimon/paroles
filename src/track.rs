@@ -1,37 +1,34 @@
+use anyhow::anyhow;
 use std::{fmt, time::Duration};
 
-use anyhow::{anyhow, Result};
-
 #[derive(Debug, Default, Clone, Copy)]
-pub enum FeatDelimiter<'a> {
+pub enum ArtistsDelimiter<'a> {
     #[default]
     Comma,
     X,
     Feat,
     Ft,
-    Featuring,
     Ampersand,
     Custom(&'a str),
 }
 
-impl fmt::Display for FeatDelimiter<'_> {
+impl fmt::Display for ArtistsDelimiter<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
-            FeatDelimiter::Comma => ",",
-            FeatDelimiter::X => "x",
-            FeatDelimiter::Feat => "feat.",
-            FeatDelimiter::Ft => "ft.",
-            FeatDelimiter::Featuring => "featuring",
-            FeatDelimiter::Ampersand => "&",
-            FeatDelimiter::Custom(custom) => custom.trim(),
+            Self::Comma => ",",
+            Self::X => "x",
+            Self::Feat => "feat.",
+            Self::Ft => "ft.",
+            Self::Ampersand => "&",
+            Self::Custom(custom) => custom.trim(),
         };
 
         write!(f, "{}", s)
     }
 }
 
-impl FeatDelimiter<'_> {
-    pub fn as_sep(&self) -> String {
+impl ArtistsDelimiter<'_> {
+    pub fn to_sep(&self) -> String {
         format!("{} ", self.to_string())
     }
 }
@@ -66,12 +63,12 @@ impl TrackInfo {
         }
     }
 
-    pub fn from_title(title: String) -> TrackInfo {
+    pub fn from_full_title(title: String) -> TrackInfo {
         if let Some((artists, name)) = title.split_once("-") {
             TrackInfo {
                 artist_names: Some(
                     artists
-                        .split(FeatDelimiter::Comma.as_sep().as_str())
+                        .split(ArtistsDelimiter::default().to_sep().as_str())
                         .map(|split| split.trim().into())
                         .collect(),
                 ),
@@ -83,34 +80,13 @@ impl TrackInfo {
         }
     }
 
-    // pub fn try_from_mpris_metadata(metadata: &mpris::Metadata) -> Result<TrackInfo> {
-    //     let name = if let Some(name) = metadata.title() {
-    //         name.into()
-    //     } else {
-    //         return Err(anyhow!("Invalid MPRIS Metadata"));
-    //     };
-
-    //     Ok(TrackInfo {
-    //         name,
-    //         artist_names: metadata
-    //             .artists()
-    //             .map(|artists| artists.iter().map(ToString::to_string).collect()),
-    //         album_name: metadata.album_name().map(|a| a.into()),
-    //         duration: metadata.length(),
-    //     })
-    // }
-
-    // pub fn try_from_gsmtc_model(model: &gsmtc::SessionModel) -> Result<TrackInfo> {
-    //     todo!()
-    // }
-
-    pub fn artist_names(&self) -> Option<&Vec<String>> {
-        self.artist_names.as_ref()
+    pub fn artist_names(&self) -> Option<&[String]> {
+        self.artist_names.as_ref().map(|vec| vec.as_slice())
     }
 
-    pub fn artist_names_str(&self, feat_delim: FeatDelimiter) -> Option<String> {
+    pub fn artist_names_str(&self, feat_delim: ArtistsDelimiter) -> Option<String> {
         let s = if let Some(artists) = &self.artist_names {
-            artists.join(feat_delim.as_sep().as_str())
+            artists.join(feat_delim.to_sep().as_str())
         } else {
             "".into()
         };
@@ -130,11 +106,11 @@ impl TrackInfo {
         self.duration.as_ref()
     }
 
-    pub fn album_name(&self) -> Option<&String> {
-        self.album_name.as_ref()
+    pub fn album_name(&self) -> Option<&str> {
+        self.album_name.as_deref()
     }
 
-    pub fn to_title(&self, feat_delim: FeatDelimiter) -> String {
+    pub fn to_title(&self, feat_delim: ArtistsDelimiter) -> String {
         let artists = self.artist_names_str(feat_delim);
 
         if let Some(artists) = artists {
@@ -148,5 +124,39 @@ impl TrackInfo {
         let has_artist = self.artist_names.is_some() && self.artist_names().unwrap().is_empty();
 
         !has_artist && self.album_name.is_none() && self.duration.is_none()
+    }
+}
+
+impl TryFrom<mpris::Metadata> for TrackInfo {
+    type Error = anyhow::Error;
+
+    fn try_from(value: mpris::Metadata) -> Result<Self, Self::Error> {
+        Ok(TrackInfo {
+            name: value.title().ok_or_else(|| anyhow!(""))?.into(),
+            artist_names: value
+                .artists()
+                .map(|v| v.iter().map(ToString::to_string).collect()),
+            album_name: value.album_name().map(ToString::to_string),
+            duration: value.length(),
+        })
+    }
+}
+
+impl TryFrom<gsmtc::SessionModel> for TrackInfo {
+    type Error = anyhow::Error;
+
+    fn try_from(value: gsmtc::SessionModel) -> Result<Self, Self::Error> {
+        let media = value.media.as_ref();
+        Ok(TrackInfo {
+            name: media.ok_or_else(|| anyhow!(""))?.title.clone(),
+            artist_names: media.map(|model| vec![model.artist.clone()]),
+            album_name: media
+                .map(|model| model.album.as_ref().map(|album| album.title.clone()))
+                .flatten(),
+            // FIXME: docs for this is unclear to me
+            duration: value
+                .timeline
+                .map(|timeline| Duration::from_millis(timeline.end as u64)),
+        })
     }
 }

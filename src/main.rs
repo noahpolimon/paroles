@@ -21,16 +21,15 @@ mod events;
 mod playback;
 mod player;
 mod providers;
-mod response;
 mod track;
+mod utils;
 
-use anyhow::anyhow;
-use anyhow::Result;
+use std::rc::Rc;
+
+use anyhow::{anyhow, Result};
 use dbus::ffidisp::Connection;
-use lrc::Lyrics;
-use lrc::TimeTag;
-use providers::LRCLib;
-use providers::{LyricsFinder, Provider};
+use lrc::{Lyrics, TimeTag};
+use providers::{lyrics_finder, LRCLib, Musixmatch};
 use track::TrackInfo;
 
 fn main() -> Result<()> {
@@ -40,7 +39,8 @@ fn main() -> Result<()> {
     //
     // Reason: applications such as KDEConnect also uses MPRIS, so it might default to that if media
     // such as a YT video or Twitch Stream is playing on other devices.
-    let mut player = player_finder.find_active()?;
+    let player = player_finder.find_active()?;
+
     let mpris_metadata = player.get_metadata()?;
 
     let artists = mpris_metadata.artists();
@@ -55,16 +55,14 @@ fn main() -> Result<()> {
             mpris_metadata.length(),
         );
 
-        println!(
-            "Currently Playing: {}\n",
-            query.to_title(Default::default())
-        );
+        println!("|> Now Playing: {}\n", query.to_title(Default::default()));
 
         let lrclib = LRCLib::new()?;
+        let musixmatch = Musixmatch::new()?;
 
-        let lyrics_finder = lyrics_finder!(&lrclib);
+        let lyrics_finder = lyrics_finder!(&musixmatch);
 
-        let response = lyrics_finder.search(query.clone())?;
+        let response = lyrics_finder.search(&query)?;
 
         let mut index = 0;
 
@@ -77,50 +75,51 @@ fn main() -> Result<()> {
         }
 
         let lyrics = if index >= response.len() {
-            return Err(anyhow!("Synced Lyrics not found"));
+            return Err(anyhow!("Lyrics not found"));
         } else {
             response.get(index).unwrap().synced_lyrics.as_ref()
         };
 
         let lrc = Lyrics::from_str(lyrics.unwrap())?;
-        player = player_finder.find_active().unwrap();
 
-        let start_timed_lyric = [(TimeTag::new(0), "".into())];
+        let start_timed_line = [(TimeTag::new(0), Rc::from(""))];
 
-        let mut peekable_timed_lines = start_timed_lyric
+        let mut peekable_timed_lines = start_timed_line
             .iter()
             .chain(lrc.get_timed_lines())
             .peekable();
 
-        while let Some((tag, line)) = peekable_timed_lines.next() {
+        let millis_compensation = -500; // workaround for late lyrics
+
+        'outer: while let Some((tag, line)) = peekable_timed_lines.next() {
             let next_timestamp = peekable_timed_lines.peek().map_or_else(
                 || {
                     mpris_metadata
                         .length()
-                        .map(|duration| duration.as_micros() as i64)
+                        .map(|duration| duration.as_millis() as i64)
                         .unwrap_or_else(|| i64::MAX)
                 },
                 |(tag, _)| tag.get_timestamp(),
             );
 
-            let time_range = tag.get_timestamp()..next_timestamp;
+            let current_timestamp = tag.get_timestamp() + millis_compensation;
+
+            let time_range = current_timestamp..next_timestamp;
+
+            if current_timestamp == millis_compensation {
+                continue;
+            }
 
             let mut position = player.get_position().unwrap().as_millis() as i64;
 
-            let mut flag = false;
-
             while !time_range.contains(&position) {
-                position = player.get_position().unwrap().as_millis() as i64;
-
                 if position > next_timestamp {
-                    flag = true;
-                    break;
+                    continue 'outer;
                 }
+                position = player.get_position().unwrap().as_millis() as i64;
             }
 
-            if !flag {
-                println!("{} {}", tag, line);
-            }
+            println!("{} {}", tag, line);
         }
     } else {
         return Err(anyhow!("Failed to parse lyrics"));

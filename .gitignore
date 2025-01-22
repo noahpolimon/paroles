@@ -2,3 +2,4 @@
 .idea
 .vscode
 Cargo.lock
+musixmatch_session.json
