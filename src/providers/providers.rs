@@ -1,10 +1,13 @@
-use crate::{errors::NoError, track::TrackInfo};
-use anyhow::{anyhow, Result};
+use std::any::TypeId;
 
-use super::Response;
+use crate::{errors::NoError, song::SongInfo};
+use anyhow::{anyhow, Result};
+use strum_macros::EnumIter;
+
+use super::{LRCLib, Musixmatch, Response};
 
 pub trait Provider: core::fmt::Debug {
-    fn search(&self, query: &TrackInfo) -> Result<Response>;
+    fn search(&self, query: &SongInfo) -> Result<Response>;
 }
 
 type ProviderList<'a> = Vec<&'a dyn Provider>;
@@ -19,7 +22,7 @@ impl<'a> LyricsFinder<'a> {
         Self { providers }
     }
 
-    pub fn search(&self, query: &TrackInfo) -> Result<Response> {
+    pub fn find(&self, query: &SongInfo) -> Result<Response> {
         let mut response = vec![];
         let mut err = anyhow!(NoError);
 

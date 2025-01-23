@@ -1,48 +1,34 @@
-use core::fmt;
-use std::{any, str::FromStr, time::Duration};
-
-use crate::{
-    providers::{LyricsMetadata, Response},
-    track::TrackInfo,
-};
-use anyhow::{anyhow, Result};
-use musixmatch_inofficial::Musixmatch as MX;
-use tokio::runtime::Runtime as TokioRuntime;
-
-#[derive(Default)]
-pub struct MusixmatchInner(MX);
-
-impl fmt::Debug for MusixmatchInner {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "MusixMatch")
-    }
-}
+use std::time::Duration;
 
 use super::Provider;
+use crate::{
+    providers::{Response, SongMetadata},
+    song::SongInfo,
+};
+use anyhow::Result;
+use musixmatch_inofficial::models::{SubtitleFormat as MXSubFormat, TrackId as MXTrackId};
+use musixmatch_inofficial::Musixmatch as MusixMatchInner;
+use tokio::runtime::Runtime as TokioRuntime;
 
-#[derive(Debug)]
 pub struct Musixmatch {
-    inner: MusixmatchInner,
+    inner: MusixMatchInner,
     tokio_runtime: TokioRuntime,
 }
+
 impl Musixmatch {
     pub fn new() -> Result<Musixmatch> {
         Ok(Musixmatch {
-            inner: MusixmatchInner::default(),
+            inner: MusixMatchInner::default(),
             tokio_runtime: TokioRuntime::new()?,
         })
-    }
-
-    fn get_api(&self) -> &MX {
-        &self.inner.0
     }
 }
 
 impl Provider for Musixmatch {
-    fn search(&self, query: &TrackInfo) -> Result<Response> {
+    fn search(&self, query: &SongInfo) -> Result<Response> {
         let artist_names_str = query.artist_names_str(Default::default()).unwrap();
 
-        let track_query = self.get_api().track_search();
+        let track_query = self.inner.track_search();
 
         let tracks = self.tokio_runtime.block_on(async {
             if query.has_name_only() {
@@ -52,7 +38,7 @@ impl Provider for Musixmatch {
                     .q_track(query.name())
                     .q_artist(&artist_names_str)
             }
-            .send(10, 1)
+            .send(5, 1)
             .await
         })?;
 
@@ -61,11 +47,9 @@ impl Provider for Musixmatch {
             .map(|track| {
                 let lyrics = self
                     .tokio_runtime
-                    .block_on(self.get_api().track_subtitle(
-                        musixmatch_inofficial::models::TrackId::TrackId(
-                            tracks.first().unwrap().track_id,
-                        ),
-                        musixmatch_inofficial::models::SubtitleFormat::Lrc,
+                    .block_on(self.inner.track_subtitle(
+                        MXTrackId::TrackId(track.track_id),
+                        MXSubFormat::Lrc,
                         query.duration().map(|duration| duration.as_secs() as f32),
                         Some(1f32),
                     ))
@@ -73,7 +57,9 @@ impl Provider for Musixmatch {
 
                 let lyrics_ref = lyrics.as_ref();
 
-                LyricsMetadata {
+                // SongMetadata::from((track, lyrics_ref.unwrap()));
+
+                SongMetadata {
                     id: lyrics_ref.map(|sub| sub.subtitle_id as i64),
                     artist_name: Some(track.artist_name.clone()),
                     track_name: Some(track.track_name.clone()),
@@ -96,5 +82,11 @@ impl Provider for Musixmatch {
                 }
             })
             .collect())
+    }
+}
+
+impl std::fmt::Debug for Musixmatch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Musixmatch API")
     }
 }

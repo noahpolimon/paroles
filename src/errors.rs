@@ -12,3 +12,7 @@ pub struct FindingError(pub String);
 #[derive(Debug, Error)]
 #[error("")]
 pub struct GsmtcError;
+
+#[derive(Debug, Error)]
+#[error("Missing Info: {0}")]
+pub struct MissingInfoError(pub String);

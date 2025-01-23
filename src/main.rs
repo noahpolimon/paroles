@@ -21,16 +21,14 @@ mod events;
 mod playback;
 mod player;
 mod providers;
-mod track;
+mod song;
 mod utils;
-
-use std::rc::Rc;
 
 use anyhow::{anyhow, Result};
 use dbus::ffidisp::Connection;
 use lrc::{Lyrics, TimeTag};
 use providers::{lyrics_finder, LRCLib, Musixmatch};
-use track::TrackInfo;
+use song::SongInfo;
 
 fn main() -> Result<()> {
     let connection = Connection::new_session()?;
@@ -43,86 +41,72 @@ fn main() -> Result<()> {
 
     let mpris_metadata = player.get_metadata()?;
 
-    let artists = mpris_metadata.artists();
-    let title = mpris_metadata.title();
-    let album = mpris_metadata.album_name();
+    let song_info = SongInfo::try_from(&mpris_metadata)?;
 
-    if let Some(title) = title {
-        let query = TrackInfo::new(
-            title.into(),
-            artists.map(|artists| artists.iter().map(ToString::to_string).collect()),
-            album.map(|a| a.into()),
-            mpris_metadata.length(),
+    println!(
+        "|> Now Playing: {}\n",
+        song_info.to_title(Default::default())
+    );
+
+    let lrclib = LRCLib::new()?;
+    let musixmatch = Musixmatch::new()?;
+
+    let lyrics_finder = lyrics_finder!(lrclib, musixmatch);
+
+    let response = lyrics_finder.find(&song_info)?;
+
+    let mut index = 0;
+
+    for lyrics in &response {
+        if lyrics.synced_lyrics.is_some() {
+            break;
+        }
+
+        index += 1;
+    }
+
+    let lyrics = if index == response.len() {
+        return Err(anyhow!("Lyrics not found"));
+    } else {
+        response.get(index).unwrap().synced_lyrics.as_ref()
+    };
+
+    let mut lrc = Lyrics::from_str(lyrics.unwrap())?;
+    lrc.add_timed_line(TimeTag::new(0), "")?;
+
+    let mut peekable_timed_lines = lrc.get_timed_lines().iter().peekable();
+
+    let millis_compensation = -500; // workaround for late lyrics
+
+    'outer: while let Some((tag, line)) = peekable_timed_lines.next() {
+        let current_timestamp = tag.get_timestamp() + millis_compensation;
+
+        if current_timestamp == millis_compensation {
+            continue;
+        }
+
+        let mut position = player.get_position().unwrap().as_millis() as i64;
+
+        let next_timestamp = peekable_timed_lines.peek().map_or_else(
+            || {
+                mpris_metadata
+                    .length()
+                    .map(|duration| duration.as_millis() as i64)
+                    .unwrap_or_else(|| i64::MAX)
+            },
+            |(tag, _)| tag.get_timestamp(),
         );
 
-        println!("|> Now Playing: {}\n", query.to_title(Default::default()));
+        let time_range = current_timestamp..next_timestamp;
 
-        let lrclib = LRCLib::new()?;
-        let musixmatch = Musixmatch::new()?;
-
-        let lyrics_finder = lyrics_finder!(&musixmatch);
-
-        let response = lyrics_finder.search(&query)?;
-
-        let mut index = 0;
-
-        for lyrics in &response {
-            if lyrics.synced_lyrics.is_some() {
-                break;
+        while !time_range.contains(&position) {
+            if position > next_timestamp {
+                continue 'outer;
             }
-
-            index += 1;
+            position = player.get_position().unwrap().as_millis() as i64;
         }
 
-        let lyrics = if index >= response.len() {
-            return Err(anyhow!("Lyrics not found"));
-        } else {
-            response.get(index).unwrap().synced_lyrics.as_ref()
-        };
-
-        let lrc = Lyrics::from_str(lyrics.unwrap())?;
-
-        let start_timed_line = [(TimeTag::new(0), Rc::from(""))];
-
-        let mut peekable_timed_lines = start_timed_line
-            .iter()
-            .chain(lrc.get_timed_lines())
-            .peekable();
-
-        let millis_compensation = -500; // workaround for late lyrics
-
-        'outer: while let Some((tag, line)) = peekable_timed_lines.next() {
-            let next_timestamp = peekable_timed_lines.peek().map_or_else(
-                || {
-                    mpris_metadata
-                        .length()
-                        .map(|duration| duration.as_millis() as i64)
-                        .unwrap_or_else(|| i64::MAX)
-                },
-                |(tag, _)| tag.get_timestamp(),
-            );
-
-            let current_timestamp = tag.get_timestamp() + millis_compensation;
-
-            let time_range = current_timestamp..next_timestamp;
-
-            if current_timestamp == millis_compensation {
-                continue;
-            }
-
-            let mut position = player.get_position().unwrap().as_millis() as i64;
-
-            while !time_range.contains(&position) {
-                if position > next_timestamp {
-                    continue 'outer;
-                }
-                position = player.get_position().unwrap().as_millis() as i64;
-            }
-
-            println!("{} {}", tag, line);
-        }
-    } else {
-        return Err(anyhow!("Failed to parse lyrics"));
+        println!("{} {}", tag, line);
     }
 
     Ok(())

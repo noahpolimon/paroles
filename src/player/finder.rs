@@ -33,7 +33,7 @@ impl PlayerFinder {
     pub fn find_all(&self) -> Result<Vec<Player>> {
         self.iter_players()
             .map(|iter| iter.into_iter().flatten().collect())
-            .map_err(|err| anyhow!(FindingError("players".into())))
+            .map_err(|_| anyhow!(FindingError("players".into())))
     }
 
     pub fn find_first(&self) -> Result<Player> {
@@ -43,6 +43,22 @@ impl PlayerFinder {
                 .next()
                 .ok_or(anyhow!(FindingError("first player".into())))
         })?
+    }
+
+    pub fn find_playing(&self) -> Result<Vec<Player>> {
+        self.iter_players()
+            .map(|iter| {
+                iter.flatten()
+                    .filter(|player| {
+                        if let Ok(status) = player.get_playback_status() {
+                            status.is_active()
+                        } else {
+                            false
+                        }
+                    })
+                    .collect()
+            })
+            .map_err(|_| anyhow!(FindingError("players with status `Playing`".into())))
     }
 
     pub fn find_active(&self) -> Result<Player> {

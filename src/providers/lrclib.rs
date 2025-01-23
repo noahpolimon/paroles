@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use reqwest::{blocking::Client, header::HeaderMap};
 
-use crate::track::{ArtistsDelimiter, TrackInfo};
+use crate::song::{ArtistsDelimiter, SongInfo};
 
 use super::{req_response_to_local_response, Provider, Response};
 
@@ -26,7 +26,7 @@ impl LRCLib {
 }
 
 impl Provider for LRCLib {
-    fn search(&self, query: &TrackInfo) -> Result<Response> {
+    fn search(&self, query: &SongInfo) -> Result<Response> {
         let feat_delim = ArtistsDelimiter::Comma;
 
         let mut params = vec![];

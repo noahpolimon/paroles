@@ -5,7 +5,7 @@ pub mod providers;
 pub mod response;
 
 pub use lrclib::*;
-pub use macros::*;
+pub(crate) use macros::*;
 pub use musixmatch::*;
 pub use providers::*;
 pub use response::*;

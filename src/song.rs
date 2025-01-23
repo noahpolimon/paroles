@@ -34,21 +34,21 @@ impl ArtistsDelimiter<'_> {
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct TrackInfo {
+pub struct SongInfo {
     name: String,
     artist_names: Option<Vec<String>>,
     album_name: Option<String>,
     duration: Option<Duration>,
 }
 
-impl TrackInfo {
+impl SongInfo {
     pub fn new(
         name: String,
         artist_names: Option<Vec<String>>,
         album_name: Option<String>,
         duration: Option<Duration>,
-    ) -> TrackInfo {
-        TrackInfo {
+    ) -> SongInfo {
+        SongInfo {
             name,
             artist_names,
             album_name,
@@ -56,16 +56,16 @@ impl TrackInfo {
         }
     }
 
-    pub fn with_name(name: String) -> TrackInfo {
-        TrackInfo {
+    pub fn with_name(name: String) -> SongInfo {
+        SongInfo {
             name,
             ..Default::default()
         }
     }
 
-    pub fn from_full_title(title: String) -> TrackInfo {
+    pub fn from_full_title(title: String) -> SongInfo {
         if let Some((artists, name)) = title.split_once("-") {
-            TrackInfo {
+            SongInfo {
                 artist_names: Some(
                     artists
                         .split(ArtistsDelimiter::default().to_sep().as_str())
@@ -76,7 +76,7 @@ impl TrackInfo {
                 ..Default::default()
             }
         } else {
-            TrackInfo::with_name(title)
+            SongInfo::with_name(title)
         }
     }
 
@@ -127,12 +127,15 @@ impl TrackInfo {
     }
 }
 
-impl TryFrom<mpris::Metadata> for TrackInfo {
+impl TryFrom<&mpris::Metadata> for SongInfo {
     type Error = anyhow::Error;
 
-    fn try_from(value: mpris::Metadata) -> Result<Self, Self::Error> {
-        Ok(TrackInfo {
-            name: value.title().ok_or_else(|| anyhow!(""))?.into(),
+    fn try_from(value: &mpris::Metadata) -> Result<Self, Self::Error> {
+        Ok(SongInfo {
+            name: value
+                .title()
+                .ok_or_else(|| anyhow!("No Title provided!"))?
+                .into(),
             artist_names: value
                 .artists()
                 .map(|v| v.iter().map(ToString::to_string).collect()),
@@ -142,13 +145,16 @@ impl TryFrom<mpris::Metadata> for TrackInfo {
     }
 }
 
-impl TryFrom<gsmtc::SessionModel> for TrackInfo {
+impl TryFrom<&gsmtc::SessionModel> for SongInfo {
     type Error = anyhow::Error;
 
-    fn try_from(value: gsmtc::SessionModel) -> Result<Self, Self::Error> {
+    fn try_from(value: &gsmtc::SessionModel) -> Result<Self, Self::Error> {
         let media = value.media.as_ref();
-        Ok(TrackInfo {
-            name: media.ok_or_else(|| anyhow!(""))?.title.clone(),
+        Ok(SongInfo {
+            name: media
+                .ok_or_else(|| anyhow!("No Title provided!"))?
+                .title
+                .clone(),
             artist_names: media.map(|model| vec![model.artist.clone()]),
             album_name: media
                 .map(|model| model.album.as_ref().map(|album| album.title.clone()))
@@ -156,6 +162,7 @@ impl TryFrom<gsmtc::SessionModel> for TrackInfo {
             // FIXME: docs for this is unclear to me
             duration: value
                 .timeline
+                .as_ref()
                 .map(|timeline| Duration::from_millis(timeline.end as u64)),
         })
     }
