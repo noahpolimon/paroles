@@ -1,10 +1,8 @@
 use std::time::Duration;
 
-use super::Provider;
-use crate::{
-    providers::{Response, SongMetadata},
-    song::SongInfo,
-};
+use super::{ProviderTrait, Response, SongMetadata};
+use crate::song::SongInfo;
+
 use anyhow::Result;
 use musixmatch_inofficial::models::{SubtitleFormat as MXSubFormat, TrackId as MXTrackId};
 use musixmatch_inofficial::Musixmatch as MusixMatchInner;
@@ -24,18 +22,18 @@ impl Musixmatch {
     }
 }
 
-impl Provider for Musixmatch {
+impl ProviderTrait for Musixmatch {
     fn search(&self, query: &SongInfo) -> Result<Response> {
         let artist_names_str = query.artist_names_str(Default::default()).unwrap();
 
         let track_query = self.inner.track_search();
 
         let tracks = self.tokio_runtime.block_on(async {
-            if query.has_name_only() {
-                track_query.q(query.name())
+            if query.has_title_only() {
+                track_query.q(query.title())
             } else {
                 track_query
-                    .q_track(query.name())
+                    .q_track(query.title())
                     .q_artist(&artist_names_str)
             }
             .send(5, 1)

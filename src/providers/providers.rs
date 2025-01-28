@@ -1,16 +1,15 @@
-use std::any::TypeId;
-
 use crate::{errors::NoError, song::SongInfo};
 use anyhow::{anyhow, Result};
-use strum_macros::EnumIter;
+use enum_wrap::{enum_wrap, enum_wrap_impl};
 
 use super::{LRCLib, Musixmatch, Response};
 
-pub trait Provider: core::fmt::Debug {
+#[enum_wrap_impl]
+pub trait ProviderTrait: core::fmt::Debug {
     fn search(&self, query: &SongInfo) -> Result<Response>;
 }
 
-type ProviderList<'a> = Vec<&'a dyn Provider>;
+pub type ProviderList<'a> = Vec<&'a dyn ProviderTrait>;
 
 #[derive(Debug)]
 pub struct LyricsFinder<'a> {

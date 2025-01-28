@@ -1,8 +1,11 @@
+# workspace = { members = ["enum_wrap"] }
+
 [package]
 name = "paroles"
 version = "0.1.0"
 authors = ["noahpolimon <polimonnoah@gmail.com>"]
 edition = "2021"
+resolver = "2"
 
 [dependencies]
 reqwest = { version = "0.12.12", features = ["blocking", "json"] }
@@ -12,10 +15,8 @@ anyhow = "1.0.95"
 thiserror = "2.0.9"
 mpris = "2.0.1"
 lrc = "0.1.8"
-dbus = "0.9.7"
-strum = "0.23"
-strum_macros = "0.23"
 win-gsmtc = "0.1.0"
 tokio = { version = "1.42.0", features = ["rt", "rt-multi-thread"] }
 chrono = "0.4.39"
 musixmatch-inofficial = "0.2.0"
+enum_wrap = { git = "https://github.com/noahpolimon/enum_wrap.git" }

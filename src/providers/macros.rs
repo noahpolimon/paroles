@@ -1,30 +1,22 @@
 macro_rules! provider_list {
-    [$(&$p:expr), +] => {
+    [$($p:expr), +] => {
         {
-            type OptionalProvidersList<'a> = ::std::vec::Vec<
-                ::std::option::Option<&'a dyn $crate::providers::Provider>>;
-
             let mut seen = vec![];
-            let providers: OptionalProvidersList = vec![$({
-                let id = $crate::utils::typeid_of_val(&$p);
+            let mut providers: $crate::providers::ProviderList = vec![];
+
+            ($({
+                let id = $crate::utils::typeid_of_val($p);
                 if !seen.contains(&id) {
                     seen.push(id);
-                    Some(&$p)
-                } else {
-                    None
+                    providers.push($p);
                 }
             }
-            ), +];
+            ), +);
 
-            ::std::iter::IntoIterator::into_iter(providers)
-                .flatten()
-                .collect()
+            providers
         }
     };
     [$($p:expr), +] => {
-        $crate::providers::macros::provider_list![$(&$p), +]
-    };
-    [$($p:expr,) +] => {
         $crate::providers::macros::provider_list![$($p), +]
     };
 }

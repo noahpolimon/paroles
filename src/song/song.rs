@@ -35,7 +35,7 @@ impl ArtistsDelimiter<'_> {
 
 #[derive(Debug, Default, Clone)]
 pub struct SongInfo {
-    name: String,
+    title: String,
     artist_names: Option<Vec<String>>,
     album_name: Option<String>,
     duration: Option<Duration>,
@@ -49,7 +49,7 @@ impl SongInfo {
         duration: Option<Duration>,
     ) -> SongInfo {
         SongInfo {
-            name,
+            title: name,
             artist_names,
             album_name,
             duration,
@@ -58,7 +58,7 @@ impl SongInfo {
 
     pub fn with_name(name: String) -> SongInfo {
         SongInfo {
-            name,
+            title: name,
             ..Default::default()
         }
     }
@@ -72,7 +72,7 @@ impl SongInfo {
                         .map(|split| split.trim().into())
                         .collect(),
                 ),
-                name: name.to_string(),
+                title: name.to_string(),
                 ..Default::default()
             }
         } else {
@@ -98,8 +98,8 @@ impl SongInfo {
         }
     }
 
-    pub fn name(&self) -> &str {
-        &self.name
+    pub fn title(&self) -> &str {
+        &self.title
     }
 
     pub fn duration(&self) -> Option<&Duration> {
@@ -110,17 +110,17 @@ impl SongInfo {
         self.album_name.as_deref()
     }
 
-    pub fn to_title(&self, feat_delim: ArtistsDelimiter) -> String {
+    pub fn to_full_title(&self, feat_delim: ArtistsDelimiter) -> String {
         let artists = self.artist_names_str(feat_delim);
 
         if let Some(artists) = artists {
-            format!("{} - {}", artists, self.name)
+            format!("{} - {}", artists, self.title)
         } else {
-            self.name.clone()
+            self.title.clone()
         }
     }
 
-    pub fn has_name_only(&self) -> bool {
+    pub fn has_title_only(&self) -> bool {
         let has_artist = self.artist_names.is_some() && self.artist_names().unwrap().is_empty();
 
         !has_artist && self.album_name.is_none() && self.duration.is_none()
@@ -132,7 +132,7 @@ impl TryFrom<&mpris::Metadata> for SongInfo {
 
     fn try_from(value: &mpris::Metadata) -> Result<Self, Self::Error> {
         Ok(SongInfo {
-            name: value
+            title: value
                 .title()
                 .ok_or_else(|| anyhow!("No Title provided!"))?
                 .into(),
@@ -151,7 +151,7 @@ impl TryFrom<&gsmtc::SessionModel> for SongInfo {
     fn try_from(value: &gsmtc::SessionModel) -> Result<Self, Self::Error> {
         let media = value.media.as_ref();
         Ok(SongInfo {
-            name: media
+            title: media
                 .ok_or_else(|| anyhow!("No Title provided!"))?
                 .title
                 .clone(),
